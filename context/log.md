@@ -57,3 +57,46 @@
 
 - **DICTATION** (`/Users/tanimura/Desktop/DICTATION/`): 本プロジェクトの成果物(SQLite)を消費する予定。DICTATION 側の `CLAUDE.md` と `context/log.md` にも本分離の経緯を記録する。
 - **TASK** (`/Users/tanimura/Desktop/TASK/`): 谷村の Vault。本プロジェクト発生の経緯は TASK 側の log にも一行記録する。
+
+---
+
+## 2026-04-21(追記: 設計書 + MVP スキャフォールド投入)
+
+バックグラウンドエージェント(Opus)から Codex CLI に委譲して、設計書と MVP スキャフォールドを投入した。
+
+### 作成ファイル一覧
+
+- `docs/plan.md`(設計書、Opus が直接 Write。§1-§12 の章立て)
+- `schema.sql`(drugs / ingredients / drug_ingredients / diseases / disease_aliases / icd10 / source_meta)
+- `pyproject.toml`(setuptools、Python 3.11+、pandas/requests/lxml/bs4/jaconv/zstandard、dev: pytest)
+- `justfile`(build / test / fetch-sources / make-dist / clean)
+- `.gitignore`(/build/lib/ 限定で Python パッケージ `build/` を追跡対象に維持)
+- `README.md`(簡潔版、詳細は plan.md 参照)
+- `sources/{pmda_attachment,yakkakijun,ippanmei,manbyo,dpc_shobyomei}.py` + `__init__.py`(各 fetch/parse/run 実装、SOURCE_URL 定数化)
+- `normalizer/{kana,dedupe,link}.py` + `__init__.py`(jaconv ベースの正規化、ソース優先順位付き重複解決、多対多リンク)
+- `build/{build_sqlite,manifest}.py` + `__init__.py`(schema 適用 → dedupe/link → to_sql → VACUUM → zstd 圧縮、manifest.json 生成)
+- `tests/{test_schema,test_normalizer,test_row_counts}.py` + `__init__.py`(スキーマ存在・正規化スナップショット・行数閾値)
+- `.github/workflows/monthly-update.yml`(cron `0 3 1 * *` + workflow_dispatch、setup-python → install → build → test → manifest → softprops/action-gh-release@v2)
+- `dist/.gitkeep`
+
+### Codex への指示要旨
+
+- 2 回に分けて発注:
+  1. 初回: 全スキャフォールド一括。sources/normalizer/.github/schema.sql/pyproject/justfile/README/.gitignore を生成したところで時間切れに見える。
+  2. 追加: build/ と tests/ のみ(既存ファイルを読み込んで整合性を取る前提)。
+- 制約: CLAUDE.md / context/log.md / docs/plan.md は不可侵、git・依存解決・DL は一切禁止、`/Users/tanimura/Desktop/jp-med-dict/` 以外に触らない。
+- 各 Python モジュールのカラム名・関数シグネチャは docs/plan.md §3〜§5 と整合させる。
+- 全 17 Python ファイルが `python3 -c "import ast; ast.parse(...)"` でパースできることを事後検証済み。
+
+### 未解決 / 次アクションの更新
+
+- [x] `docs/plan.md` 起草(v0.1 draft)
+- [x] スキーマ設計(schema.sql 確定)
+- [x] Codex に ETL スキャフォールド発注(sources / normalizer / build / GH Actions / tests)
+- [x] 配布フォーマット: SQLite + zstd + manifest.json(§6.3 仕様)で確定
+- [x] 更新頻度: 月次 cron(1 日 03:00 UTC)+ 薬価改定 4/1 は workflow_dispatch 手動
+- [ ] 初回 fetch を手動実行して `SOURCE_URL` 実在確認(別セッション)
+- [ ] v0.1.0 の初回 Release を手動トリガ
+- [ ] `LICENSE`(MIT)と `LICENSE-DATA`(CC BY-SA 4.0)のファイル化(v0.2)
+- [ ] DICTATION 側の消費コード設計(別リポ)
+- [ ] 手技 K コード・ICD-10 単独辞書・旧字体マッピングの追加(v0.2)
